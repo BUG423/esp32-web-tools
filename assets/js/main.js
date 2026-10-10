@@ -121,7 +121,7 @@
     const links = document.querySelectorAll("a[data-asset]");
     for (const a of links) {
       const url = a.getAttribute("href");
-      if (!url || url.startsWith("http")) continue;
+      if (!url || url.startsWith("http://") || url.startsWith("https://") || url.startsWith("//")) continue;
       try {
         const r = await fetch(url, { method: "HEAD", cache: "no-store" });
         if (!r.ok) markBroken(a, r.status);
