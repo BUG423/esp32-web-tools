@@ -1,12 +1,19 @@
-/** OpenBlock ESP32 firmware updater: Web Serial in browsers, native Rust serial in Tauri. */
+/**
+ * 主应用脚本
+ * ============
+ *
+ * 职责：
+ *   1. 渲染年份；
+ *   2. 安全上下文 / 浏览器能力的兼容性体检，结果写到固件卡片；
+ *   3. 下载链接探活，避免用户点了之后才发现 404；
+ *   4. manifest.json 预校验，提前给出比 vendor 更友好的中文错误；
+ *   5. 集中收敛 ESP Web Tools 的事件，必要时弹中文 toast。
+ */
+
 (function () {
   "use strict";
 
-  const DEFAULT_SOURCE = {
-    remoteManifest: "https://github.com/BUG423/OpenBlock-ESP32/releases/latest/download/firmware-manifest.json",
-    localManifest: "./firmware/manifest.json",
-  };
-
+  // ----- 工具：轻量 toast -----
   const toast = (() => {
     let host = null;
     function ensure() {
@@ -27,20 +34,27 @@
       document.body.appendChild(host);
       return host;
     }
-    return function showToast(message, type = "info", ttl = 4200) {
+    return function toast(msg, type = "info", ttl = 3500) {
       const el = document.createElement("div");
-      el.textContent = message;
+      el.textContent = msg;
       Object.assign(el.style, {
-        background: type === "error" ? "#d0443b" : type === "warn" ? "#a56b00" : "#3d4761",
+        background:
+          type === "error"
+            ? "rgba(255,80,80,0.92)"
+            : type === "warn"
+            ? "rgba(255,180,60,0.92)"
+            : "rgba(20,20,30,0.92)",
         color: "#fff",
         padding: "10px 16px",
-        borderRadius: "8px",
-        boxShadow: "0 10px 30px rgba(0,0,0,.24)",
-        fontSize: "12px",
+        borderRadius: "12px",
+        boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
+        fontSize: "14px",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
         pointerEvents: "auto",
         opacity: "0",
         transform: "translateY(8px)",
-        transition: "opacity .2s ease, transform .2s ease",
+        transition: "opacity .25s ease, transform .25s ease",
       });
       ensure().appendChild(el);
       requestAnimationFrame(() => {
@@ -50,298 +64,175 @@
       setTimeout(() => {
         el.style.opacity = "0";
         el.style.transform = "translateY(8px)";
-        setTimeout(() => el.remove(), 220);
+        setTimeout(() => el.remove(), 280);
       }, ttl);
     };
   })();
 
-  function appendCardHint(text, key = "environment") {
+  // ----- 工具：在 flash 卡片底部追加一条中文提示 -----
+  function appendCardHint(text, type = "warn") {
     const card = document.querySelector('[data-card="flash"]');
-    if (!card || card.querySelector(`[data-hint="${key}"]`)) return;
-    const hint = document.createElement("div");
-    hint.className = "hint warn";
-    hint.dataset.hint = key;
-    hint.textContent = text;
-    card.appendChild(hint);
+    if (!card) return;
+    if (card.querySelector(`[data-hint="${type}-${text.length}"]`)) return;
+    const div = document.createElement("div");
+    div.className = "hint warn";
+    div.dataset.hint = `${type}-${text.length}`;
+    div.style.marginTop = "10px";
+    div.textContent = text;
+    card.appendChild(div);
   }
 
-  function removeCardHint(key) {
-    document.querySelector(`[data-hint="${key}"]`)?.remove();
-  }
-
-  function setWebAvailability(available, message) {
-    const button = document.getElementById("btn-flash");
-    if (!button) return;
-    button.disabled = !available;
-    button.dataset.firmwareReady = available ? "true" : "false";
-    const label = button.querySelector("span");
-    if (label) label.textContent = available ? "开始更新系统固件" : "固件暂不可用";
-    removeCardHint("firmware");
-    if (!available && message) appendCardHint(message, "firmware");
-  }
-
-  function findTauriInvoke() {
-    const scopes = [window];
-    try {
-      if (window.parent !== window) scopes.push(window.parent);
-      if (window.top && window.top !== window.parent) scopes.push(window.top);
-    } catch (_error) {
-      // Cross-origin parents are irrelevant; the bundled desktop frames are same-origin.
-    }
-    for (const scope of scopes) {
-      try {
-        const bridgeInvoke = scope.__OPENBLOCK_TAURI__?.invoke;
-        if (typeof bridgeInvoke === "function") {
-          return bridgeInvoke.bind(scope.__OPENBLOCK_TAURI__);
-        }
-        const invoke = scope.__TAURI__?.core?.invoke;
-        if (typeof invoke === "function") return invoke.bind(scope.__TAURI__.core);
-      } catch (_error) {
-        // Continue looking in the next same-origin frame.
-      }
-    }
-    return null;
-  }
-
-  async function loadSourceConfig() {
-    try {
-      const response = await fetch("./firmware/source.json", { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return { ...DEFAULT_SOURCE, ...(await response.json()) };
-    } catch (_error) {
-      return DEFAULT_SOURCE;
-    }
-  }
-
+  // ----- 1. 年份 -----
   function renderYear() {
-    const year = document.getElementById("year");
-    if (year) year.textContent = new Date().getFullYear();
+    const el = document.getElementById("year");
+    if (el) el.textContent = new Date().getFullYear();
   }
 
+  // ----- 2. 兼容性体检 -----
+  function diagnose() {
+    const isSecure =
+      window.isSecureContext ||
+      location.protocol === "https:" ||
+      location.hostname === "localhost" ||
+      location.hostname === "127.0.0.1" ||
+      location.hostname === "" /* file:// 也走警告分支 */;
+    const hasSerial = "serial" in navigator;
+
+    if (location.protocol === "file:") {
+      appendCardHint(
+        "⚠ 检测到您用 file:// 直接打开本页。浏览器会拒绝调用串口，请使用 http://localhost 或 HTTPS 域名打开。"
+      );
+      return;
+    }
+    if (!isSecure) {
+      appendCardHint(
+        "⚠ 当前不是 HTTPS 环境，浏览器将拒绝调用串口。请使用 HTTPS 域名（或 localhost）访问本页。"
+      );
+    }
+    if (!hasSerial) {
+      appendCardHint(
+        "⚠ 当前浏览器不支持 Web Serial。请使用桌面端 Chrome / Edge 109 及以上版本访问。"
+      );
+    }
+  }
+
+  // ----- 3. 下载链接探活（HEAD），避免点完才知道 404 -----
   async function probeDownloads() {
-    for (const link of document.querySelectorAll("a[data-asset]")) {
-      const url = link.getAttribute("href");
+    const links = document.querySelectorAll("a[data-asset]");
+    for (const a of links) {
+      const url = a.getAttribute("href");
       if (!url || url.startsWith("http")) continue;
       try {
-        const response = await fetch(url, { method: "HEAD", cache: "no-store" });
-        if (!response.ok) markBroken(link, response.status);
-      } catch (_error) {
-        markBroken(link, "unreachable");
+        const r = await fetch(url, { method: "HEAD", cache: "no-store" });
+        if (!r.ok) markBroken(a, r.status);
+      } catch (_e) {
+        markBroken(a, "unreachable");
       }
     }
   }
-
-  function markBroken(link, code) {
-    link.classList.add("disabled");
-    link.title = `资源暂不可用（${code}）`;
-    link.style.opacity = "0.55";
-    link.style.cursor = "not-allowed";
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      toast(`该资源暂未发布或路径错误（${code}）。`, "warn");
+  function markBroken(a, code) {
+    a.classList.add("disabled");
+    a.title = `资源暂不可用（${code}）`;
+    a.style.opacity = "0.55";
+    a.style.cursor = "not-allowed";
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      toast(`该资源暂未发布或路径错误（${code}），请联系管理员。`, "warn");
     });
   }
 
-  function hexDigest(bytes) {
-    return [...new Uint8Array(bytes)]
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
-  }
-
-  async function validateManifest(url) {
-    if (!window.crypto?.subtle) throw new Error("当前环境无法执行 SHA-256 固件校验");
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(`固件清单请求失败（HTTP ${response.status}）`);
-    const manifest = await response.json();
-    if (!Array.isArray(manifest.builds) || manifest.builds.length === 0) {
-      throw new Error("固件清单缺少 builds 数组");
-    }
-    const base = new URL(url, location.href);
-    let count = 0;
-    for (const build of manifest.builds) {
-      for (const part of build.parts || []) {
-        if (!part?.path) continue;
-        if (!/^[a-f\d]{64}$/i.test(part.sha256 || "")) {
-          throw new Error(`${part.path} 缺少有效 SHA-256`);
-        }
-        const partUrl = new URL(part.path, base);
-        const partResponse = await fetch(partUrl, { cache: "no-store" });
-        if (!partResponse.ok) throw new Error(`${part.path} 请求失败（HTTP ${partResponse.status}）`);
-        const bytes = await partResponse.arrayBuffer();
-        const size = bytes.byteLength;
-        if (size <= 0) throw new Error(`${part.path} 是空文件`);
-        if (part.size != null && Number(part.size) !== size) {
-          throw new Error(`${part.path} 的大小与清单不一致`);
-        }
-        const actual = hexDigest(await window.crypto.subtle.digest("SHA-256", bytes));
-        if (actual.toLowerCase() !== part.sha256.toLowerCase()) {
-          throw new Error(`${part.path} 的 SHA-256 与清单不一致`);
-        }
-        count += 1;
-      }
-    }
-    if (!count) throw new Error("固件清单中没有可烧录分片");
-    return manifest;
-  }
-
-  async function configureBrowser(source) {
-    document.getElementById("flash-runtime").textContent = "浏览器 Web Serial";
-    document.getElementById("flash-source").textContent = "在线优先 / 本地回退";
-    const webFlasher = document.getElementById("web-flasher");
-    const secure = window.isSecureContext || ["localhost", "127.0.0.1"].includes(location.hostname);
-    if (!secure) appendCardHint("当前页面不是 HTTPS，浏览器会拒绝串口权限。", "secure");
-    if (!("serial" in navigator)) {
-      appendCardHint("当前浏览器不支持 Web Serial。网页端请使用桌面版 Chrome / Edge；OpenBlock 软件端会自动改用原生串口。", "serial");
-    }
-
-    let selected = source.remoteManifest;
-    if (selected) {
-      try {
-        await validateManifest(selected);
-        document.getElementById("flash-source").textContent = "在线最新固件";
-      } catch (remoteError) {
-        selected = source.localManifest;
-        try {
-          await validateManifest(selected);
-          document.getElementById("flash-source").textContent = "本地固件（远程暂不可用）";
-        } catch (localError) {
-          setWebAvailability(false, `固件尚未发布完整：${localError.message}。远程源：${remoteError.message}。`);
-          return;
-        }
-      }
-    } else {
-      selected = source.localManifest;
-      try {
-        await validateManifest(selected);
-        document.getElementById("flash-source").textContent = "本地固件";
-      } catch (localError) {
-        setWebAvailability(false, `固件尚未就绪：${localError.message}。`);
+  // ----- 4. manifest.json 预校验，比 vendor 报错更友好 -----
+  async function probeManifest() {
+    const btn = document.querySelector("esp-web-install-button");
+    if (!btn) return;
+    const url = btn.getAttribute("manifest");
+    if (!url) return;
+    try {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) {
+        appendCardHint(
+          `⚠ 固件清单 ${url} 加载失败（HTTP ${r.status}）。请确认固件已上传。`
+        );
         return;
       }
-    }
-    webFlasher.setAttribute("manifest", selected);
-    setWebAvailability(secure && "serial" in navigator);
-  }
-
-  function setNativeStatus(message, type = "") {
-    const status = document.getElementById("native-status");
-    status.textContent = message;
-    status.className = `hint${type ? ` ${type}` : ""}`;
-  }
-
-  async function configureNative(invoke, source) {
-    const webFlasher = document.getElementById("web-flasher");
-    const nativeFlasher = document.getElementById("native-flasher");
-    const portSelect = document.getElementById("native-port");
-    const flashButton = document.getElementById("btn-native-flash");
-    const refreshButton = document.getElementById("refresh-ports");
-    webFlasher.hidden = true;
-    nativeFlasher.hidden = false;
-    document.getElementById("flash-description").textContent = "软件端直接访问系统串口，在线下载、校验并烧录最新 ESP32 固件";
-    document.getElementById("flash-runtime").textContent = "软件原生串口";
-    document.getElementById("flash-source").textContent = "远程发布 / 校验缓存 / 软件内置";
-    document.getElementById("environment-tip").textContent = "软件端无需 Web Serial；若创作页已连接设备，请先断开再更新";
-
-    async function refreshPorts() {
-      refreshButton.disabled = true;
-      flashButton.disabled = true;
-      portSelect.replaceChildren();
-      setNativeStatus("正在读取系统串口…");
-      try {
-        const ports = await invoke("list_firmware_ports");
-        for (const port of ports) {
-          const option = document.createElement("option");
-          option.value = port.path;
-          option.textContent = port.label;
-          portSelect.appendChild(option);
-        }
-        if (ports.length) {
-          flashButton.disabled = false;
-          setNativeStatus(`已发现 ${ports.length} 个串口。优先选择带 USB 设备名称的端口。`);
-        } else {
-          setNativeStatus("未发现串口。请连接 ESP32，并确认驱动已安装。", "warn");
-        }
-      } catch (error) {
-        setNativeStatus(String(error), "error");
-      } finally {
-        refreshButton.disabled = false;
+      const json = await r.json();
+      if (!Array.isArray(json.builds) || json.builds.length === 0) {
+        appendCardHint("⚠ 固件清单格式无效：缺少 builds 数组。");
+        return;
       }
-    }
-
-    refreshButton.addEventListener("click", refreshPorts);
-    flashButton.addEventListener("click", async () => {
-      if (!portSelect.value || !source.remoteManifest) return;
-      if (!window.confirm("即将更新 ESP32 系统固件。请确认已保存项目，并且烧录过程中不会拔出数据线。")) return;
-      flashButton.disabled = true;
-      refreshButton.disabled = true;
-      portSelect.disabled = true;
-      const label = flashButton.querySelector("span");
-      label.textContent = "正在下载、校验并烧录…";
-      setNativeStatus("正在获取远程固件；网络不可用时会尝试上次通过校验的缓存。设备可能自动重启数次。", "warn");
-      try {
-        const result = await invoke("flash_esp32_firmware", {
-          port: portSelect.value,
-          manifestUrl: source.remoteManifest,
-        });
-        const sourceLabel = {
-          cache: "本地校验缓存",
-          bundled: "软件内置固件",
-          online: "在线源",
-        }[result.source] || result.source;
-        setNativeStatus(`更新完成：${result.version}，写入 ${Math.round(result.bytesWritten / 1024)} KiB（${sourceLabel}）。`, "success");
-        toast("ESP32 系统固件更新完成");
-      } catch (error) {
-        const message = String(error);
-        setNativeStatus(message, "error");
-        toast("固件更新失败，请查看卡片中的详细提示。", "error", 6000);
-      } finally {
-        label.textContent = "下载并烧录最新固件";
-        flashButton.disabled = !portSelect.value;
-        refreshButton.disabled = false;
-        portSelect.disabled = false;
+      // 检查每个 build 的第一个 part 是否能 fetch（HEAD）
+      const base = new URL(url, location.href);
+      for (const b of json.builds) {
+        const part = (b.parts || [])[0];
+        if (!part || !part.path) continue;
+        const partUrl = new URL(part.path, base);
+        try {
+          const pr = await fetch(partUrl, { method: "HEAD", cache: "no-store" });
+          if (!pr.ok) {
+            appendCardHint(
+              `⚠ ${b.chipFamily} 固件文件 ${part.path} 暂时不可用（HTTP ${pr.status}）。`
+            );
+          }
+        } catch {
+          appendCardHint(
+            `⚠ ${b.chipFamily} 固件文件 ${part.path} 无法访问，请检查路径。`
+          );
+        }
       }
-    });
-    await refreshPorts();
+    } catch (e) {
+      appendCardHint(`⚠ 固件清单解析失败：${e.message}`);
+    }
   }
 
-  function bindWebEvents() {
-    const button = document.getElementById("btn-flash");
-    const messages = {
-      installed: "固件烧录完成",
-      "installation-error": "固件烧录失败",
-      "installation-aborted": "烧录已取消",
+  // ----- 5. 监听 ESP Web Tools 事件，提供中文 toast -----
+  function bindFlashEvents() {
+    const btn = document.querySelector("esp-web-install-button");
+    if (!btn) return;
+    // 这些是 install-dialog 在 dispatch 的事件名
+    const map = {
+      installed: "✅ 固件烧录完成",
+      "installation-error": "❌ 固件烧录失败",
+      "installation-aborted": "⚠ 烧录已取消",
     };
-    for (const [eventName, message] of Object.entries(messages)) {
-      document.addEventListener(eventName, () => {
-        toast(message, eventName === "installation-error" ? "error" : eventName === "installation-aborted" ? "warn" : "info");
+    Object.entries(map).forEach(([evt, msg]) => {
+      document.addEventListener(evt, () => {
+        toast(
+          msg,
+          evt === "installed" ? "info" : evt === "installation-error" ? "error" : "warn"
+        );
+      });
+    });
+
+    // 防止用户连点：点击后 1 秒内禁用按钮
+    const inner = btn.querySelector("#btn-flash");
+    if (inner) {
+      inner.addEventListener("click", () => {
+        inner.disabled = true;
+        setTimeout(() => (inner.disabled = false), 1200);
       });
     }
-    button?.addEventListener("click", (event) => {
-      if (button.dataset.firmwareReady !== "true") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        toast("固件镜像尚未发布完整，当前禁止烧录。", "warn");
+  }
+
+  // ----- 6. 全局错误提示，捕获 vendor 抛出的未处理 Promise 错误 -----
+  function bindGlobalError() {
+    window.addEventListener("unhandledrejection", (e) => {
+      const m = (e.reason && e.reason.message) || String(e.reason || "");
+      if (/serial|port|baudRate|requestPort/i.test(m)) {
+        toast(`串口操作失败：${m}`, "error", 5000);
       }
     });
   }
 
-  window.addEventListener("unhandledrejection", (event) => {
-    const message = event.reason?.message || String(event.reason || "");
-    if (/serial|port|baudRate|requestPort/i.test(message)) {
-      toast(`串口操作失败：${message}`, "error", 6000);
-    }
-  });
-
-  document.addEventListener("DOMContentLoaded", async () => {
+  // ----- 启动 -----
+  document.addEventListener("DOMContentLoaded", () => {
     renderYear();
-    bindWebEvents();
-    probeDownloads();
-    const source = await loadSourceConfig();
-    const invoke = findTauriInvoke();
-    if (invoke) {
-      await configureNative(invoke, source);
-    } else {
-      await configureBrowser(source);
-    }
+    diagnose();
+    bindFlashEvents();
+    bindGlobalError();
+    // 探活和 manifest 校验放后台，不阻塞首屏
+    setTimeout(() => {
+      probeDownloads();
+      probeManifest();
+    }, 0);
   });
 })();

@@ -3,71 +3,133 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#4c97ff" />
-  <title>ESP-Web2 - ESP32 固件在线烧录与驱动中心</title>
+  <meta name="theme-color" content="#0a84ff" />
+  <title>ESP32配套服务中心</title>
   <link rel="stylesheet" href="./assets/css/style.css" />
-  <script type="module" src="./assets/esp_web_tool/install-button.js"></script>
+
+  <script
+    type="module"
+    src="./assets/esp_web_tool/install-button.js"
+  ></script>
 </head>
 <body>
+  <div class="bg-orb orb-a" aria-hidden="true"></div>
+  <div class="bg-orb orb-b" aria-hidden="true"></div>
+  <div class="bg-orb orb-c" aria-hidden="true"></div>
+  <div class="bg-grain" aria-hidden="true"></div>
+
   <main class="page">
+    <header class="hero glass">
+      <div class="hero-badge">ESP32 · 配套服务</div>
+      <h1>ESP32配套服务中心</h1>
+      <p class="subtitle">一站式驱动安装、图形化编程软件下载与系统在线更新</p>
+    </header>
+
     <section class="cards" aria-label="功能区">
-      <article class="card ob-panel" data-card="driver">
+      <article class="card glass" data-card="driver">
         <div class="card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" />
+            <path d="M12 3v12" />
+            <path d="m7 10 5 5 5-5" />
+            <path d="M5 21h14" />
           </svg>
         </div>
         <h2>CH340 驱动</h2>
-        <p>Windows USB 串口驱动，安装后用于识别 ESP32</p>
+        <p>USB 串口驱动，安装后即可识别ESP32</p>
         <a class="btn primary" href="./downloads/CH340/CH341SER.EXE" download data-asset>
-          <span>下载驱动</span>
+          <span>立即下载</span>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
           </svg>
         </a>
-        <div class="card-meta"><span>Windows 10 / 11</span><span>·</span><span>约 0.8 MB</span></div>
+        <div class="card-meta">
+          <span>Windows 10 / 11</span>
+          <span>·</span>
+          <span>约 0.8 MB</span>
+        </div>
       </article>
 
-      <article class="card ob-panel featured" data-card="flash">
+      <article class="card glass featured" data-card="ide">
         <div class="card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg>
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="14" rx="2" />
+            <path d="M8 20h8" /><path d="M12 18v2" />
+            <path d="m9 10 2 2-2 2" />
+            <path d="M13 14h3" />
+          </svg>
         </div>
-        <h2>系统固件更新</h2>
-        <p id="flash-description">在线获取最新固件，通过串口安全写入 ESP32</p>
-        <esp-web-install-button id="web-flasher" manifest="./firmware/manifest.json" class="ewt-button">
-          <button class="btn primary" slot="activate" id="btn-flash" disabled>
-            <span>正在校验固件…</span>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
+        <h2>图形化编程软件</h2>
+        <p>面向ESP32的图形化编程环境，零基础上手</p>
+        <a class="btn primary" href="./downloads/CH340/CH341SER.EXE" download data-asset>
+          <span>立即下载</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+          </svg>
+        </a>
+        <div class="card-meta">
+          <span>Windows 10 / 11</span>
+          <span>·</span>
+          <span>稳定版</span>
+        </div>
+      </article>
+
+      <article class="card glass" data-card="flash">
+        <div class="card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+          </svg>
+        </div>
+        <h2>系统在线更新</h2>
+        <p>浏览器直连串口完成系统在线更新</p>
+
+        <esp-web-install-button
+          manifest="./firmware/manifest.json"
+          class="ewt-button"
+        >
+          <button class="btn primary" slot="activate" id="btn-flash">
+            <span>开始在线更新</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" />
+            </svg>
           </button>
-          <span slot="unsupported" class="hint warn">当前浏览器不支持 Web Serial。请使用最新版桌面端 Chrome 或 Edge。</span>
-          <span slot="not-allowed" class="hint warn">页面必须在 HTTPS 环境或 localhost 下打开，才能调用浏览器串口。</span>
+          <span slot="unsupported" class="hint warn">
+            当前浏览器不支持 Web Serial。请使用最新版桌面端 Chrome 或 Edge 访问本页。
+          </span>
+          <span slot="not-allowed" class="hint warn">
+            页面必须在 HTTPS 环境（或 localhost）下打开，才能调用浏览器串口。
+          </span>
         </esp-web-install-button>
-        <div id="native-flasher" class="native-flasher" hidden>
-          <div class="native-port-row">
-            <label class="sr-only" for="native-port">选择 ESP32 串口</label>
-            <select id="native-port" aria-label="选择 ESP32 串口"></select>
-            <button id="refresh-ports" class="compact-btn" type="button">刷新</button>
-          </div>
-          <button class="btn primary" id="btn-native-flash" type="button" disabled>
-            <span>下载并烧录最新固件</span>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-          </button>
-          <div id="native-status" class="hint" role="status" aria-live="polite"></div>
+
+        <div class="card-meta">
+          <span>Web Serial</span>
+          <span>·</span>
+          <span>需 HTTPS</span>
         </div>
-        <div class="card-meta"><span id="flash-runtime">自动检测运行环境</span><span>·</span><span id="flash-source">在线固件</span></div>
       </article>
     </section>
 
-    <section class="tips ob-panel">
-      <div class="tip"><strong>① 连接硬件</strong><p>使用数据线连接 ESP32，必要时先安装 CH340 驱动</p></div>
-      <div class="tip"><strong>② 选择串口</strong><p id="environment-tip">网页端使用 Chrome / Edge；确保运行在 HTTPS 或 localhost 环境</p></div>
-      <div class="tip"><strong>③ 开始更新</strong><p>网页会在线下载并校验镜像，写入完成前不要断开设备</p></div>
+    <section class="tips glass">
+      <div class="tip">
+        <strong>① 连接硬件</strong>
+        <p>使用数据线将ESP32连接到电脑 USB 口，必要时先安装 CH340 驱动</p>
+      </div>
+      <div class="tip">
+        <strong>② 选择浏览器</strong>
+        <p>推荐使用 Chrome / Edge 109 及以上版本</p>
+      </div>
+      <div class="tip">
+        <strong>③ 授权串口</strong>
+        <p>点击「开始在线更新」后，在弹出的窗口中选择对应的 COM 口并授权</p>
+      </div>
     </section>
 
     <footer class="footer">
-      <span>© <span id="year"></span> ESP-Web2</span><span class="dot">·</span><span>ESP32 Web Serial 在线固件更新</span>
+      <span>© <span id="year"></span> ESP32配套服务</span>
+      <span class="dot">·</span>
+      <span>已离线部署 ESP Web Tools 10.2.1（汉化版）</span>
     </footer>
   </main>
+
   <script src="./assets/js/main.js" defer></script>
 </body>
 </html>

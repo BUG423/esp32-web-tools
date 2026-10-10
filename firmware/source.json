@@ -1,4 +1,0 @@
-{
-  "remoteManifest": "https://github.com/BUG423/OpenBlock-ESP32/releases/latest/download/firmware-manifest.json",
-  "localManifest": "./firmware/manifest.json"
-}

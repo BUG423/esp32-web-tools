@@ -1,17 +1,57 @@
-# ⚡ ESP-Web2
+# ⚡ ESP-Web2 - ESP32 固件在线烧录与驱动中心
 
-ESP-Web2 是一个专为 ESP32 系列芯片打造的独立在线固件烧录与驱动服务中心。项目基于 [ESP Web Tools](https://esphome.github.io/esp-web-tools/) 与浏览器原生 **Web Serial API** 构建，采用纯静态架构，可直接作为独立代码仓库托管至 GitHub Pages 或任何静态 Web 服务器。
+ESP-Web2 是一个专为 ESP32 系列芯片打造的纯静态在线固件烧录与配套驱动服务中心。项目基于 [ESP Web Tools](https://esphome.github.io/esp-web-tools/) 与浏览器原生 **Web Serial API** 构建，无需在本地配置 Python、`esptool` 或庞大的交叉编译工具链，用户使用现代桌面端浏览器即可一站式完成串口识别、驱动下载与固件快速烧录。
 
 ---
 
 ## ✨ 核心特性
 
-- **纯网页 Web Serial 在线烧录**：无需在本地安装 Python、`esptool` 或 ESP-IDF 开发环境，在现代浏览器中点击即可连接串口并烧录固件。
-- **本地化依赖与离线就绪**：页面所需所有 CSS、JavaScript 及 ESP Web Tools 组件（含各种芯片的 stub flasher）均已完整本地化，不依赖第三方 CDN。
-- **CH340 串口驱动分发**：内置集成常用 CH340 Windows USB 串口驱动下载及指引，一站式解决设备识别问题。
-- **严格固件校验与安全保护**：烧录前自动执行 SHA-256 完整性哈希校验和文件非空检查，杜绝因镜像损坏或占位文件导致设备变砖。
-- **双模固件源策略**：支持远程在线固件源（GitHub Releases）与本地内置固件双重回退，断网或远程源不可用时平滑切换。
-- **开箱即用 GitHub Pages 自动化部署**：包含完整的 GitHub Actions 持续部署工作流和 `.nojekyll` 配置，推送即上线。
+- **🌌 沉浸式极光拟态 UI (Glassmorphism)**：采用深色星空渐变、动态色彩光球与通透毛玻璃卡片设计，交互优雅直观。
+- **⚡ 浏览器原生 Web Serial 直连**：免安装本地烧录工具，通过浏览器标准串口 API 实现与 ESP32 硬件的高速通信。
+- **🐍 官方 MicroPython v1.27.0 固件**：内置经过完整验证的官方 ESP32 MicroPython 稳定版固件（包含完整镜像及标准分片）。
+- **📦 离线化本地依赖**：样式文件、交互脚本及 ESP Web Tools 多芯片 Flash Stub 均已完整离线部署，不依赖外部 CDN。
+- **🛠️ 驱动与工具一站式服务**：内置 CH340 串口芯片驱动下载，提供新手友好的步骤式操作引导与状态反馈。
+- **🚀 GitHub Pages 自动化上线**：内置 GitHub Actions 持续集成与部署工作流及 `.nojekyll` 配置，支持零配置托管上线。
+
+---
+
+## 🔌 浏览器与运行环境要求
+
+Web Serial API 是浏览器直接与 USB 串口设备通信的关键底层能力，受浏览器安全模型严格约束：
+
+| 维度 | 要求说明 |
+| --- | --- |
+| **安全上下文** | 必须在 **HTTPS 协议**或本地开发环境（`http://localhost` / `http://127.0.0.1`）下运行。普通 HTTP 协议会被浏览器强制禁止访问串口。 |
+| **推荐浏览器** | 推荐使用桌面端 **Google Chrome** 或 **Microsoft Edge**（版本 89 及以上，推荐 109+）。<br>⚠️ *Safari、Firefox 及移动端浏览器目前尚未原生支持 Web Serial API。* |
+| **硬件连接** | 请使用具备数据传输能力的优质 USB 数据线连接 ESP32 开发板（避免仅有供电功能的充电线）。 |
+| **设备驱动** | 若 Windows 设备管理器显示黄色感叹号或无法识别端口，请先下载并安装页面提供的 **CH340 驱动**。 |
+
+---
+
+## 🚀 快速上手 / 本地运行
+
+由于浏览器的安全策略，`file://` 协议下禁止使用 ES Module、Fetch 请求以及 Web Serial 串口访问，请通过本地 HTTP 服务器运行：
+
+### 使用 Python 快速启动
+
+```bash
+cd /path/to/ESP-Web2
+python3 -m http.server 8080
+```
+
+### 使用 Node.js 快速启动
+
+```bash
+npx serve .
+# 或使用 http-server
+npx http-server . -p 8080
+```
+
+启动完成后，使用 Chrome 或 Edge 打开：
+
+```text
+http://localhost:8080
+```
 
 ---
 
@@ -22,104 +62,44 @@ ESP-Web2/
 ├── .github/
 │   └── workflows/
 │       └── pages.yml           # GitHub Pages 自动化部署工作流
-├── .gitignore                  # Git 忽略文件规则
-├── .nojekyll                   # 禁用 GitHub Pages Jekyll 处理
-├── README.md                   # 项目中文文档
-├── index.html                  # 独立烧录与驱动入口页面
+├── .gitignore                  # Git 忽略文件配置
+├── .nojekyll                   # 禁用 Jekyll 静态处理
+├── LICENSE                     # 开源许可协议
+├── README.md                   # 项目使用与配置说明文档
+├── index.html                  # 核心入口页面
 ├── assets/
 │   ├── css/
-│   │   └── style.css           # 页面样式文件
-│   ├── esp_web_tool/           # 本地化 ESP Web Tools 运行库及各芯片 Flash Stub
+│   │   └── style.css           # 极光夜空毛玻璃样式表
+│   ├── esp_web_tool/           # 本地化 ESP Web Tools 运行库及多芯片 Flasher Stub
 │   │   ├── install-button.js   # Web Component 入口 (<esp-web-install-button>)
-│   │   ├── install-dialog-*.js # 烧录引导对话框
-│   │   └── ...                 # 针对 ESP32 / S2 / S3 / C2 / C3 / C5 / C6 / H2 / P4 的分发文件
+│   │   ├── install-dialog-*.js # 烧录引导对话框组件
+│   │   └── ...                 # ESP32 / S2 / S3 / C2 / C3 / C5 / C6 / H2 / P4 运行支持库
 │   └── js/
-│       └── main.js             # 运行环境检测、固件校验及逻辑控制
+│       └── main.js             # 运行环境自检、下载探活及交互控制
 ├── downloads/
 │   └── CH340/
 │       └── CH341SER.EXE        # Windows CH340 USB 串口驱动安装包
 └── firmware/
     ├── binaries/               # 固件镜像目录
-    │   ├── bootloader_0x1000.bin
-    │   ├── partition-table_0x8000.bin
-    │   └── micropython_0x10000.bin
-    ├── manifest.json           # ESP Web Tools 固件分片与校验清单
-    └── source.json             # 固件源配置（远程地址与本地回退）
+    │   ├── bootloader_0x1000.bin        # 引导程序 (0x1000)
+    │   ├── partition-table_0x8000.bin   # 分区表 (0x8000)
+    │   ├── micropython_0x10000.bin      # MicroPython 应用程序 (0x10000)
+    │   └── ESP32_GENERIC-v1.27.0.bin    # MicroPython 官方完整镜像
+    └── manifest.json           # ESP Web Tools 固件分片与配置清单
 ```
 
 ---
 
-## 🚀 本地运行
+## 🛠️ 固件配置与自定义
 
-由于现代浏览器的安全沙箱机制，`file://` 协议下禁止使用 ES Module、`fetch()` API 以及 Web Serial 串口访问，因此**不能**直接双击打开 `index.html`。
+### 1. 固件清单规范 (`firmware/manifest.json`)
 
-请在项目根目录下通过 Python 快速启动本地静态 HTTP 服务器：
-
-```bash
-cd /path/to/ESP-Web2
-python3 -m http.server 8080
-```
-
-启动后，在浏览器中访问：
-
-```text
-http://localhost:8080
-```
-
-> **提示**：Node.js 环境下也可以使用 `npx serve .` 或 `npx http-server . -p 8080` 启动。
-
----
-
-## 🔌 Web Serial 运行环境要求
-
-Web Serial API 是浏览器直接与 USB 串口设备通信的关键技术，受浏览器安全策略严格约束：
-
-| 条件项 | 要求说明 |
-| --- | --- |
-| **网络环境** | 必须在 **HTTPS** 协议安全上下文，或本地开发环境（`http://localhost` / `http://127.0.0.1`）下运行。普通公网 HTTP 会被浏览器强制拦截。 |
-| **浏览器支持** | 推荐使用最新版桌面端 **Google Chrome**、**Microsoft Edge** 或 **Opera**（内核版本需 ≥ 89）。<br>❌ *Safari、Firefox 及各类移动端浏览器目前不支持 Web Serial API。* |
-| **硬件连接** | 请使用支持数据传输的高质量 USB 数据线连接 ESP32（避免使用仅具备供电功能的充电线）。 |
-| **驱动安装** | Windows 10/11 系统如果设备管理器中识别为黄色感叹号或未识别设备，请先下载并安装页面左侧提供的 **CH340 驱动**。 |
-
----
-
-## 🌐 GitHub Pages 自动化部署
-
-本项目已预置标准 GitHub Actions 持续集成工作流 [`.github/workflows/pages.yml`](file:///.github/workflows/pages.yml)。当项目作为独立 Git 仓库推送到 GitHub 时，可自动构建并托管到 GitHub Pages。
-
-### 部署步骤：
-
-1. **新建 GitHub 仓库**：在 GitHub 上创建一个新的仓库（例如 `ESP-Web2`）。
-2. **推送代码**：
-   ```bash
-   git init
-   git add .
-   git commit -m "feat: initial commit for ESP-Web2"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/ESP-Web2.git
-   git push -u origin main
-   ```
-3. **开启 GitHub Pages**：
-   - 进入 GitHub 仓库页面，点击 **Settings** -> **Pages**。
-   - 在 **Build and deployment** -> **Source** 下拉菜单中，选择 **GitHub Actions**。
-4. **自动上线**：
-   - 每当向 `main` 分支执行 `push` 时，GitHub Actions 会自动打包根目录下所有静态文件并完成部署。
-   - 部署成功后，访问 `https://<your-username>.github.io/ESP-Web2/` 即可在线使用。
-
-### 为什么包含 `.nojekyll`？
-GitHub Pages 默认会启用 Jekyll 静态引擎，Jekyll 会自动忽略以下划线（`_`）或点（`.`）开头的目录与文件，并可能跳过某些特殊命名的打包资源。根目录中的空 `.nojekyll` 文件会明确告知 GitHub Pages 禁用 Jekyll 解析，确保所有本地库、驱动及固件文件原样无损发布。
-
----
-
-## 🛠️ 固件管理与自定义
-
-### 1. 固件清单格式 (`firmware/manifest.json`)
-ESP Web Tools 根据 `manifest.json` 下载各分片并写入对应 Flash 偏移：
+ESP Web Tools 根据 `manifest.json` 解析芯片型号、烧录偏移量并下载对应分片：
 
 ```json
 {
-  "name": "ESP-Web2 ESP32 Firmware",
-  "version": "1.0.0",
+  "name": "ESP32 MicroPython 固件",
+  "version": "1.27.0",
   "new_install_prompt_erase": true,
   "builds": [
     {
@@ -140,8 +120,8 @@ ESP Web Tools 根据 `manifest.json` 下载各分片并写入对应 Flash 偏移
         {
           "path": "./binaries/micropython_0x10000.bin",
           "offset": 65536,
-          "size": 0,
-          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          "size": 1698016,
+          "sha256": "fdb2434e468fd50108c46e1e45424df9f44e864fc14979122cdc51d7e049b1f0"
         }
       ]
     }
@@ -149,40 +129,43 @@ ESP Web Tools 根据 `manifest.json` 下载各分片并写入对应 Flash 偏移
 }
 ```
 
-- `offset`：Flash 烧录地址十进制字节表示（`4096` = `0x1000`，`32768` = `0x8000`，`65536` = `0x10000`）。
-- `path`：分片相对 `manifest.json` 的相对路径。
-- `size`：分片文件字节大小。
-- `sha256`：分片文件的 SHA-256 哈希值。
+- **`chipFamily`**：目标芯片架构，如 `ESP32`、`ESP32-S3`、`ESP32-C3` 等。
+- **`offset`**：Flash 写入起始地址（十进制字节表示，`4096` = `0x1000`，`32768` = `0x8000`，`65536` = `0x10000`）。
+- **`path`**：固件二进制相对于 `manifest.json` 的访问路径。
+- **`new_install_prompt_erase`**：全新安装时是否提示擦除整个 Flash（推荐 `true`）。
 
-### 2. 固件源解析规则 (`firmware/source.json`)
-```json
-{
-  "remoteManifest": "https://github.com/<owner>/<repo>/releases/latest/download/firmware-manifest.json",
-  "localManifest": "./firmware/manifest.json"
-}
-```
-- 网页打开时，优先请求并校验 `remoteManifest`，若成功则使用线上最新发布固件。
-- 若网络超时、404 或未配置 `remoteManifest`，会自动平滑回退至 `localManifest`（本地内置固件）。
+### 2. 替换为自定义固件
 
-### 3. 如何更新或替换固件
-1. 将编译生成的 `.bin` 固件复制到 `firmware/binaries/` 下。
-2. 计算文件的准确字节大小和 SHA-256：
+1. 将编译生成的 `.bin` 固件放入 `firmware/binaries/` 目录。
+2. 计算文件的字节大小与校验值：
    ```bash
-   ls -l firmware/binaries/your_app.bin
-   sha256sum firmware/binaries/your_app.bin
+   ls -l firmware/binaries/your_firmware.bin
+   sha256sum firmware/binaries/your_firmware.bin
    ```
-3. 更新 `firmware/manifest.json` 中对应的 `path`、`offset`、`size` 和 `sha256`。
-4. 刷新网页即可开始烧录。
+3. 更新 `firmware/manifest.json` 中的 `path`、`offset` 及元数据。
+4. 重新加载页面即可开始烧录。
+
+---
+
+## 🌐 GitHub Pages 托管部署
+
+1. 将仓库推送到 GitHub：
+   ```bash
+   git push origin main
+   ```
+2. 进入 GitHub 仓库设置：**Settings** ➔ **Pages**。
+3. 在 **Build and deployment** ➔ **Source** 中选择 **GitHub Actions**。
+4. 部署完成后，通过生成的 GitHub Pages 域名（自带 HTTPS）即可在线使用。
 
 ---
 
 ## ❓ 常见问题排查
 
-1. **点击“更新”时提示串口授权弹窗但找不到设备？**
-   - 检查 USB 数据线是否接触良好。
-   - 确认是否已安装 CH340 / CP2102 串口驱动。
-   - 关闭其他正在占用该串口的程序（如 Arduino IDE 串口监视器、PuTTY 等）。
-2. **提示“当前浏览器不支持 Web Serial”？**
-   - 请使用桌面版 Chrome 或 Edge 浏览器打开页面。
-3. **提示“页面必须在 HTTPS 环境或 localhost 下打开”？**
-   - 确认访问 URL 是否为 `https://...` 或 `http://localhost:...`。在局域网 IP（如 `http://192.168.x.x`）下，浏览器会因非安全上下文而禁止调用串口。
+1. **点击“开始在线更新”弹出选择框，但列表中找不到 ESP32 串口？**
+   - 检查 USB 线是否支持数据传输，尝试更换电脑 USB 接口（推荐插在机箱后置 USB 口）。
+   - 检查是否正确安装了 CH340 驱动；Windows 可打开“设备管理器”查看“端口 (COM 和 LPT)”是否有识别到对应设备。
+   - 确保没有其他串口调试软件（如 Arduino 串口监视器、Thonny、Putty 等）正在占用该串口。
+2. **连接时提示等待握手或连接超时？**
+   - 部分 ESP32 开发板下载电路没有自动复位功能，请在点击连接/烧录并在控制台显示连接中时，按住板载的 `BOOT`（或 `IO0`）按键 1~2 秒，待进入下载模式后再松开。
+3. **提示“页面必须在 HTTPS 环境（或 localhost）下打开”？**
+   - 现代浏览器严格限制 Web Serial 仅在安全上下文生效。请确保通过 `https://` 域名访问，或在本地使用 `http://localhost` 访问。
